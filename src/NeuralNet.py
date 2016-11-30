@@ -2,17 +2,14 @@ import numpy as np
 import random
 import warnings
 import mnist_loader
-import sys
 
 warnings.filterwarnings("ignore")
 
 
 '''
 TODO
-- change the ../data/mnist.pkl.gz to a csv format
-- get Applet to convert csv files into numpy arrays
-- get other regularization and activation functions up and running
-
+- get other regularization and activation functions working
+- work on tkinter gui
 '''
 
 
