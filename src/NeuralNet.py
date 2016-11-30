@@ -187,28 +187,6 @@ def shuffle_x_and_y(x, y):
     p = np.random.permutation(len(x))
     return x[p], y[p]
 
-"""
-Train and Test data
-"""
-def train(n, training_data, training_output):
-    l = 0
-    for i in range(len(training_data)):
-        n.backProp(training_data[i],training_output[i])
-        l +=1
-        if l % 100 == 0:
-            print(l)
-    print ("Neural Network has been trained")
-def get_accuracy(n, testing_data, testing_output):
-    correct = 0
-    total = 0
-    for i in range(len(testing_data)):
-        z = np.argmax(n.forward(testing_data[i]))
-        if z == testing_output[i]:
-            correct += 1
-        total += 0
-    return correct/total
-
-
 def main():
     lsizes = np.array(([784],[100],[100],[10]))
 
