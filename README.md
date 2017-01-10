@@ -1,2 +1,2 @@
-# Neural_Net
-Backpropogation neural network using stochastic gradient descent.
+#Machine Learning
+File dump for different resources/implementations
