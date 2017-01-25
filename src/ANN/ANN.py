@@ -20,7 +20,7 @@ def squared_error(y, yHat):
     return J
 
 class ANN(object):
-    def __init__(self, layer_sizes, regularization_function, learning_rate, momentum=0):
+    def __init__(self, layer_sizes, regularization_function, learning_rate, momentum=0):    
         self.regularization_function = regularization_function
         self.activation_function = sigmoid
         self.activation_function_prime = sigmoid_prime

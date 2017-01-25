@@ -31,7 +31,13 @@ Zero padding - pad the image with zeros around
         size of the feature maps(also called wide
         convolution)
 
+Notes
+-Pillow requires datatype np.uint8 (basically an unsigned char with range 0-255)
+-use regular integers and possibly convert the datatype when converting back to image
 '''
+
+
+
 filters = {"edge_enhance" : np.array([[0, 0, 0],
                                       [-1, 1, 0],
                                       [0, 0, 0]], dtype = np.float),
@@ -75,25 +81,44 @@ def image_to_colour_array(filepath):
     img = Image.open(filepath)
     return np.array(img)
 
+def zero_padding(image, width=1):
+    #TODO try to test out how efficient this is compared to setting all things to zero
+    new_image = image[width:-width,width:-width] #remove outer edges
+    new_image.astype(np.uint8)
+    new_image = np.pad(new_image, (width,width), 'constant') #pads image with zeros
+    return new_image
+
+
 def convolution(image, kernel, factor = 1.0, bias = 0.0):
+    """
+    creates a new convolved image
+    args:
+        image: a matrix of numbers corresponding to the pixels of the image
+        kernel: a matrix of numbers corresponding to the pixels of the filter kernel
+        factor: number to multiplies resulting pixels by
+        bias: number to add resulting pixels by
+    requires:
+        kernel must square matrix with an odd number of rows/columns
+    returns:
+        new convolved image matrix from original image and kernel
+    """
+    kernel = np.rot90(kernel, 2) #rotates the kernel by 180 degrees
     new_image = np.empty_like(image)
     k_width = len(kernel[0])
     k_height = len(kernel[:,0])
     m_width = k_width/2
     m_height = k_height/2
-    for y in range(len(image[:,0])-(k_height-1)):
-        for x in range(0,len(image[0])-(k_width-1)):
-            for z in range(len(image[0,0,:])):
-                c = np.sum(np.multiply(image[y:y+k_height, x:x+k_width,z], kernel))
-                c = min(255, c)
-                c = max(0, c)
-                new_image[y + m_height,x + m_width,z] = (c * factor + bias)
+    for y in range(len(image[:,0])-(k_height-1)): #For row in image
+        for x in range(len(image[0])-(k_width-1)): #For RGB pixels in row
+            for z in range(len(image[0,0,:])): #For pixel in RGB
+                p = np.sum(np.multiply(image[y:y+k_height, x:x+k_width,z], kernel)) * factor + bias
+                p = min(255, p)
+                p = max(0, p)
+                new_image[y + m_height,x + m_width,z] = p #Input in position at the middle of the kernel on new image
     return new_image
 
-
 def max_pooling(image, kernel, stride):
-    #new_image = np.zeros((image.shape[0], image.shape[1], image.shape[2]), np.int)
-    new_image = np.zeros_like(image)
+    new_image = np.zeros((image.shape[0]/stride, image.shape[1]/stride, image.shape[2]), np.uint8)
     k_width = len(kernel[0])
     k_height = len(kernel[:,0])
     for y in range(0,len(image[:,0])-(k_height-1), stride):
@@ -115,12 +140,15 @@ def save_image(img, name):
 
 
 def main():
+
     image = image_to_colour_array("img.jpg")
     kernel_pool = np.array([[0,0],
                             [0,0]])
     pooled_array = max_pooling(image, kernel_pool, 2)
 
     filtered_array = convolution(image, filters["edge_detect_2"])
+
+
     save_image(filtered_array, "img-convolved.jpg")
     save_image(pooled_array, "img-pooled.jpg")
 
