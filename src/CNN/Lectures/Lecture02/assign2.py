@@ -16,7 +16,7 @@ def normalize(x):
 
 def gauss1d(sigma):
     length = int(6*sigma)
-    if(length % 2 == 0):
+    if(not(length & 1)):
         length += 1
     center = length//2
     array = np.arange(-center,center+1)
@@ -25,6 +25,8 @@ def gauss1d(sigma):
 
 def gauss2d(sigma):
     one_d_gauss = gauss1d(sigma)
+    #To get a 2d gaussian filter, take the 1d gaussian and
+    #convolve it with its transpose
     two_d_gauss = signal.convolve2d(one_d_gauss[np.newaxis].T, one_d_gauss[np.newaxis])
     return two_d_gauss
 

@@ -148,7 +148,6 @@ def main():
 
     filtered_array = convolution(image, filters["edge_detect_2"])
 
-
     save_image(filtered_array, "pictures/img-convolved.jpg")
     save_image(pooled_array, "pictures/img-pooled.jpg")
 
