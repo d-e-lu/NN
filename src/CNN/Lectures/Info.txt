@@ -1,0 +1,2 @@
+CPSC 425 - computer vision
+Textbook - Computer Vision a moder approach David Forsyth
