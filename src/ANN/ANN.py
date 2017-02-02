@@ -2,77 +2,91 @@ import numpy as np
 import random
 import warnings
 import mnist_loader
+import codecs, json, os
 
 warnings.filterwarnings("ignore")
 
 #Neural Network using backpropogation and stochastic gradient descent
-
-
 def sigmoid(z):
     return 1/(1+np.exp(-z))
 def sigmoid_prime(z):
     return np.exp(-z)/((1+np.exp(-z))**2)
-
-
 
 def squared_error(y, yHat):
     J = 0.5*sum((y-yHat)**2)
     return J
 
 class ANN(object):
-    def __init__(self, layer_sizes, regularization_function, learning_rate, momentum=0):    
+    def __init__(self, layer_sizes, regularization_function, learning_rate, bias_learning_rate, momentum=0, read_weights_from_file = False):
         self.regularization_function = regularization_function
         self.activation_function = sigmoid
         self.activation_function_prime = sigmoid_prime
         self.layer_sizes = layer_sizes
         self.learning_rate = learning_rate
+        self.bias_learning_rate = bias_learning_rate
         self.momentum = momentum
         self.length = len(layer_sizes)
 
-        #self.b = []
 
+        self.b = []
         self.W = []
         self.delta_W = []
+        if read_weights_from_file == False:
+            for i in range(self.length - 1):
+                weight = np.random.randn(self.layer_sizes[i], self.layer_sizes[i+1])
+                bias = np.random.randn(self.layer_sizes[i+1])
+                self.W.append(weight)
+                self.b.append(bias)
+                self.delta_W.append(np.zeros_like(weight))
 
-        for i in range(self.length - 1):
-            weight = np.random.randn(self.layer_sizes[i], self.layer_sizes[i+1])
-            self.W.append(weight)
-            self.delta_W.append(np.zeros_like(weight))
+            self.W = np.asarray(self.W)
+            self.b = np.asarray(self.b)
+            self.delta_W = np.asarray(self.delta_W)
+        else:
+            for file_path in sorted(os.listdir("Optimal_Weights/Weights/")):
+                json_file = codecs.open("Optimal_Weights/Weights/" + file_path, 'r', encoding='utf-8').read()
+                json_weights = json.loads(json_file)
+                weights = np.array(json_weights)
+                self.W.append(weights)
 
-        self.W = np.asarray(self.W)
-        #self.b = np.random.randn(self.W.shape)
-        self.delta_W = np.asarray(self.delta_W)
 
 
     def forward(self, x):
         self.a = []
         self.z = []
-        self.z.append(np.dot(x, self.W[0]))
+        self.z.append(np.add(np.dot(x, self.W[0]), self.b[0]))
         self.a.append(self.activation_function(self.z[0]))
         for weight in range(1, len(self.W)):
-            self.z.append(np.dot(self.a[weight-1], self.W[weight]))
+            self.z.append(np.add(np.dot(self.a[weight-1], self.W[weight]),self.b[weight]))
             self.a.append(self.activation_function(self.z[weight]))
         return self.a[len(self.W)-1]
 
     def loss_function_prime(self, x, y):
         self.yHat = self.forward(x)
         dJdWList = []
+        dJdBList = []
+
         delta = np.multiply(-(y-self.yHat), self.activation_function_prime(self.z[self.length-2]))
+        dJdBList.append(delta)
         dJdW = np.multiply(self.a[self.length-3][np.newaxis].T, delta[np.newaxis])
         dJdWList.append(dJdW)
         for i in range(self.length-3, 0,-1):
             delta = np.dot(delta, self.W[i+1].T) * self.activation_function_prime(self.z[i])
+            dJdBList.append(delta)
             dJdW = np.multiply(np.asarray(self.a[i-1])[np.newaxis].T, np.asarray(delta))
             dJdWList.append(dJdW)
         delta = np.dot(delta, self.W[1].T) * self.activation_function_prime(self.z[0])
+        dJdBList.append(delta)
         xarray = np.array([x])
         dJdW = np.multiply(xarray.T, delta)
         dJdWList.append(dJdW)
+
         dJdWList.reverse()
-        return dJdWList
+        dJdBList.reverse()
+        return dJdWList, dJdBList
 
     def back_prop(self, x,y):
-        dJdWList = self.loss_function_prime(x,y)
+        dJdWList, dJdBList = self.loss_function_prime(x,y)
         if self.momentum:
             for i in range(len(dJdWList)):
                 currentWeight = self.W[i]
@@ -81,6 +95,7 @@ class ANN(object):
         else:
             for i in range(len(dJdWList)):
                 self.W[i] = self.W[i] - (dJdWList[i] * self.learning_rate)
+                self.b[i] = self.b[i] - (dJdBList[i] * self.bias_learning_rate)
         yh = self.forward(x)
         return squared_error(y, yh)
 
@@ -107,6 +122,17 @@ class ANN(object):
         for i in range(2,len(alldJdW)):
             dJdWList = np.concatenate([dJdWList, alldJdW[i].ravel()])
         return dJdWList
+
+    def save_weights(self, percentage, lsizes, learning_rate):
+        if os.path.isfile("Optimal_Weights/"):
+            pass
+        else:
+            filepath = "Optimal_Weights/Weights/W"
+            for i in range(len(self.W)):
+                weight_list = self.W[i].tolist()
+                json.dump(weight_list, codecs.open(filepath + str(i) + ".json", 'w', encoding='utf8'), sort_keys=True, indent = 4)
+
+
 
 """
 Neural_Network Check
@@ -160,9 +186,10 @@ def shuffle_x_and_y(x, y):
     return x[p], y[p]
 
 def main():
-    lsizes = np.array(([784],[200],[100],[10]))
-
-    n = ANN(lsizes, squared_error, 0.5)
+    lsizes = np.array(([784],[30],[30],[30],[10]))
+    learning_rate = 0.2
+    bias_learning_rate = 0.2
+    n = ANN(lsizes, squared_error, learning_rate, bias_learning_rate, momentum = 0.1, read_weights_from_file=False)
     training_data, validation_data, testing_data = mnist_loader.load_data_wrapper()
 
     total_cost = 0
@@ -184,7 +211,10 @@ def main():
         else:
             wrong[testing_data[i][1]] += 1
         total += 1
-    print float(correct)/total * 100, "%"
+    percentage = float(correct)/total * 100
+    print percentage, "%"
     print wrong
+    #n.save_weights(percentage, lsizes, learning_rate)
+
 if __name__ == "__main__":
     main()
