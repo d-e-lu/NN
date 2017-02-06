@@ -1,11 +1,10 @@
 import numpy as np
-import mnist_loader
-import codecs, json, os, warnings
-import time
+import codecs
+import json
+import os
+import warnings
 
 warnings.filterwarnings("ignore")
-
-# Neural Network using backpropogation and stochastic gradient descent
 
 
 def sigmoid(z):
@@ -21,7 +20,7 @@ def squared_error(y, y_hat):
     return j
 
 
-class ANN(object):
+class ArtificialNeuralNet(object):
     def __init__(self, layer_sizes, regularization_function, learning_rate, bias_learning_rate,
                  momentum=0.0, read_weights_from_file=False):
         self.regularization_function = regularization_function
@@ -104,6 +103,34 @@ class ANN(object):
         yh = self.forward(x)
         return squared_error(y, yh)
 
+    def train(self, training_data):
+        total_cost = 0
+        for z in range(1):
+            for i in range(len(training_data)):
+                cost = self.back_prop(training_data[i][0], training_data[i][1].T.ravel())
+                total_cost += cost
+                if i % 1000 == 0:
+                    avg = float(total_cost) / 1000
+                    print "data #", i, "cost:", avg
+                    total_cost = 0
+
+    def test(self, testing_data, output_size):
+        incorrect = np.zeros(output_size, dtype=np.int)
+        correct = np.zeros(output_size, dtype=np.int)
+        number_correct = 0
+        total = 0
+        for i in range(len(testing_data)):
+            z = self.forward(testing_data[i][0])
+            if np.argmax(z) == testing_data[i][1]:
+                number_correct += 1
+                correct[testing_data[i][1]] += 1
+            else:
+                incorrect[testing_data[i][1]] += 1
+            total += 1
+        percentage = float(number_correct) / total * 100
+
+        return percentage, correct, incorrect
+
     def get_params(self):
         params = np.concatenate((self.W[0].ravel(), self.W[1].ravel()))
         for weight in range(2,self.length-1):
@@ -127,6 +154,7 @@ class ANN(object):
         return dJdWList
 
     def save_weights(self, percentage, lsizes, learning_rate):
+        #TODO
         if os.path.isfile("Optimal_Weights/"):
             pass
         else:
@@ -134,6 +162,7 @@ class ANN(object):
             for i in range(len(self.W)):
                 weight_list = self.W[i].tolist()
                 json.dump(weight_list, codecs.open(filepath + str(i) + ".json", 'w', encoding='utf8'), sort_keys=True, indent = 4)
+
 
 
 """
@@ -201,48 +230,3 @@ def shuffle_x_and_y(x, y):
     p = np.random.permutation(len(x))
     return x[p], y[p]
 
-
-def main():
-    lsizes = np.array(([784], [30], [30], [10]))
-    learning_rate = 0.4
-    bias_learning_rate = 0.4
-    n = ANN(lsizes, squared_error, learning_rate, bias_learning_rate, read_weights_from_file=False)
-    training_data, validation_data, testing_data = mnist_loader.load_data_wrapper()
-
-    total_cost = 0
-    for z in range(1):
-        for i in range(len(training_data)):
-            cost = n.back_prop(training_data[i][0], training_data[i][1].T.ravel())
-            total_cost += cost
-            if i % 1000 == 0:
-                avg = float(total_cost)/1000
-                print "data #", i,"cost:", avg
-                total_cost = 0
-
-    wrong = np.zeros(10, dtype = np.int)
-    number_correct = np.zeros(10, dtype = np.int)
-    correct = 0
-    total = 0
-    average_forward = 0.0
-    for i in range(len(testing_data)):
-        start = time.time()
-        z = n.forward(testing_data[i][0])
-        end = time.time()
-        average_forward += (end - start)
-        if np.argmax(z) == testing_data[i][1]:
-            correct += 1
-            number_correct[testing_data[i][1]] += 1
-        else:
-            wrong[testing_data[i][1]] += 1
-        total += 1
-    percentage = float(correct)/total * 100
-    average_forward /= total
-
-    print "Average testing forward time: {0} ".format(str(average_forward))
-    print percentage, "%"
-    print "Correct: ", number_correct
-    print "Wrong:   ", wrong
-    # n.save_weights(percentage, lsizes, learning_rate)
-
-if __name__ == "__main__":
-    main()

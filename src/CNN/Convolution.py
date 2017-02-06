@@ -82,7 +82,6 @@ def image_to_colour_array(filepath):
     return np.array(img)
 
 def zero_padding(image, width=1):
-    #TODO try to test out how efficient this is compared to setting all things to zero
     new_image = image[width:-width,width:-width] #remove outer edges
     new_image.astype(np.uint8)
     new_image = np.pad(new_image, (width,width), 'constant') #pads image with zeros
