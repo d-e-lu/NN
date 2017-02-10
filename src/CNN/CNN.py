@@ -47,8 +47,9 @@ def save_image(img, name):
     im.save(name)
 
 
-def relu(x):
-    return np.maximum(0, x)
+'''
+Convolution and Pooling layers
+'''
 
 
 class ConvolutionLayer(object):
@@ -69,8 +70,6 @@ class ConvolutionLayer(object):
             for y in range(len(image[:, 0])-(self.size-1)):  # For every row in image
                 for x in range(len(image[0])-(self.size-1)):  # For every pixel * input depth in row
                     p = np.sum(np.multiply(image[y:y+self.size, x:x+self.size], con_filter)) * factor + bias
-                    p = max(0, p) # TODO: REMOVE LATER
-                    p = min(255, p) # TODO: REMOVE LATER
                     # Input in position at the middle of the kernel on new image
                     new_image[y+half_size, x+half_size, filter_index] = p
         return new_image
@@ -80,6 +79,17 @@ class ConvolutionLayer(object):
         new_image.astype(np.uint8)
         new_image = np.pad(new_image, ((width, width), (width, width), (0, 0)), 'constant')  # pads image with zeros
         return new_image
+
+    def forward(self, image):
+        return self.zero_padding(self.convolve(image))
+
+
+class ReluLayer(object):
+    def relu(self, image):
+        return np.maximum(0, image)
+
+    def forward(self, image):
+        return self.relu(image)
 
 
 class PoolingLayer(object):
@@ -97,26 +107,161 @@ class PoolingLayer(object):
                     new_image[y//self.stride, x//self.stride, z] = sub_image.ravel()[c]
         return new_image
 
+    def forward(self, image):
+        return self.max_pool(image)
+
+
+'''
+Fully Connected layers
+'''
+
+
+def sigmoid(z):
+    return 1/(1 + np.exp(-z))
+
+
+def sigmoid_prime(z):
+    return np.exp(-z)/((1 + np.exp(-z)) ** 2)
+
+
+def squared_error(y, y_hat):
+    j = 0.5 * sum((y - y_hat) ** 2)
+    return j
+
+
+class FullyConnectedLayer(object):
+    def __init__(self, layer_sizes, regularization_function, learning_rate, bias_learning_rate,
+                 momentum=0.0):
+        self.regularization_function = regularization_function
+        self.activation_function = sigmoid
+        self.activation_function_prime = sigmoid_prime
+        self.layer_sizes = layer_sizes
+        self.learning_rate = learning_rate
+        self.bias_learning_rate = bias_learning_rate
+        self.momentum = momentum
+        self.length = len(layer_sizes)
+
+        self.b = []  # Biases
+        self.W = []  # Weights
+        self.delta_W = []
+        for i in range(self.length - 1):
+            weight = np.random.randn(self.layer_sizes[i], self.layer_sizes[i+1])
+            bias = np.random.randn(self.layer_sizes[i+1])
+            self.W.append(weight)
+            self.b.append(bias)
+            self.delta_W.append(np.zeros_like(weight))
+        self.a = None  # Activations of layers
+        self.z = None  # Weights multiplied by input/activations
+        self.y_hat = None  # Output of neural net
+
+    def forward(self, x):
+        self.a = []
+        self.z = []
+        self.z.append(np.add(np.dot(x, self.W[0]), self.b[0]))
+        self.a.append(self.activation_function(self.z[0]))
+        for weight in range(1, len(self.W)):
+            self.z.append(np.add(np.dot(self.a[weight-1], self.W[weight]), self.b[weight]))
+            self.a.append(self.activation_function(self.z[weight]))
+        return self.a[-1]
+
+    def loss_function_prime(self, x, y):
+        self.y_hat = self.forward(x)
+        dJdWList = []
+        dJdBList = []
+
+        delta = np.multiply(-(y - self.y_hat), self.activation_function_prime(self.z[self.length - 2]))
+        dJdBList.append(delta)
+        dJdW = np.multiply(self.a[self.length-3][np.newaxis].T, delta[np.newaxis])
+        dJdWList.append(dJdW)
+        for i in range(self.length-3, 0, -1):
+            delta = np.dot(delta, self.W[i+1].T) * self.activation_function_prime(self.z[i])
+            dJdBList.append(delta)
+            dJdW = np.multiply(self.a[i-1][np.newaxis].T, delta)
+
+        dJdWList.append(dJdW)
+        delta = np.dot(delta, self.W[1].T) * self.activation_function_prime(self.z[0])
+        dJdBList.append(delta)
+        xarray = np.array([x])
+        dJdW = np.multiply(xarray.T, delta)
+        dJdWList.append(dJdW)
+
+        dJdWList.reverse()
+        dJdBList.reverse()
+        return dJdWList, dJdBList, delta
+
+    def back_prop(self, x, y):
+        dJdWList, dJdBList, delta = self.loss_function_prime(x, y)
+        if self.momentum:
+            for i in range(len(dJdWList)):
+                current_weight = self.W[i]
+                self.W[i] = self.W[i] - (dJdWList[i] * self.learning_rate) + (self.momentum * self.delta_W[i])
+                self.delta_W[i] = self.W[i] - current_weight
+                self.b[i] = self.b[i] - (dJdBList[i] * self.bias_learning_rate)
+        else:
+            for i in range(len(dJdWList)):
+                self.W[i] = self.W[i] - (dJdWList[i] * self.learning_rate)
+                self.b[i] = self.b[i] - (dJdBList[i] * self.bias_learning_rate)
+        yh = self.forward(x)
+        return delta, squared_error(y, yh)
+
+    def train(self, training_data):
+        total_cost = 0
+        for z in range(1):
+            for i in range(len(training_data)):
+                cost = self.back_prop(training_data[i][0], training_data[i][1].T.ravel())
+                total_cost += cost
+                if i % 1000 == 0:
+                    avg = float(total_cost) / 1000
+                    print ("data #", i, "cost:", avg)
+                    total_cost = 0
+
+    def test(self, testing_data, output_size):
+        incorrect = np.zeros(output_size, dtype=np.int)
+        correct = np.zeros(output_size, dtype=np.int)
+        number_correct = 0
+        total = 0
+        for i in range(len(testing_data)):
+            z = self.forward(testing_data[i][0])
+            if np.argmax(z) == testing_data[i][1]:
+                number_correct += 1
+                correct[testing_data[i][1]] += 1
+            else:
+                incorrect[testing_data[i][1]] += 1
+            total += 1
+        percentage = float(number_correct) / total * 100
+
+        return percentage, correct, incorrect
 
 class CNN(object):
-    def __init__(self, layers):
+    def __init__(self, layers, fully_connected):
         self.layers = layers
+        self.fully_connected = fully_connected
 
     def forward(self, image):
+        new_image = image
+        for layer in self.layers:
+            new_image = layer.forward(new_image)
+
+        new_image = new_image.ravel(1)
+        return self.fully_connected.forward(new_image)
+
+    def backprop(self, image, label):
+        convolution_layer_estimate = self.forward(image)
+        delta, error = self.fully_connected.backprop(convolution_layer_estimate, label)
+        print(delta)
+        '''
+        for i in range(len(self.layers)):
+            if self.layers[i] is ConvolutionLayer:
+                pass
+            elif self.layers[i] is ReluLayer:
+                pass
+            elif self.layers[i] is PoolingLayer:
+                pass
+
+        return error
+        '''
+
+    def train(self, training_data):
         pass
 
 
-def main():
-    image = image_to_colour_array("pictures/img.jpg")
-    c_layer_1 = ConvolutionLayer(size=3, input_depth=3, output_depth=1, padding=0)
-    p_layer_1 = PoolingLayer(size=2, stride=2)
-    image = c_layer_1.convolve(image)
-    save_image(image[:, :, 0], "32x32/convolve.jpg")
-    image = relu(image)
-    save_image(image[:, :, 0], "32x32/relu.jpg")
-    image = p_layer_1.max_pool(image)
-    save_image(image[:, :, 0], "32x32/pool.jpg")
-
-
-if __name__ == "__main__":
-    main()

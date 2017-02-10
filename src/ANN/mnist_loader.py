@@ -1,3 +1,9 @@
+
+
+#From http://blog.josephmisiti.com/training-MNIST-using-lasagne
+
+
+
 """
 mnist_loader
 ~~~~~~~~~~~~

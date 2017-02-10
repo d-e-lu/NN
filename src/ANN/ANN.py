@@ -111,7 +111,7 @@ class ArtificialNeuralNet(object):
                 total_cost += cost
                 if i % 1000 == 0:
                     avg = float(total_cost) / 1000
-                    print "data #", i, "cost:", avg
+                    print ("data #", i, "cost:", avg)
                     total_cost = 0
 
     def test(self, testing_data, output_size):
