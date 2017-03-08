@@ -3,7 +3,7 @@ import numpy as np
 import ANN
 
 def main():
-    lsizes = np.array(([784], [30], [30], [10]))
+    lsizes = np.array(([784], [30], [10]))
     learning_rate = 0.4
     bias_learning_rate = 0.4
     n = ANN.ArtificialNeuralNet(lsizes, ANN.squared_error, learning_rate, bias_learning_rate, read_weights_from_file=False)
@@ -13,8 +13,8 @@ def main():
     percentage, correct, incorrect = n.test(testing_data=testing_data, output_size=training_data[0][1].size)
 
     print percentage, "%"
-    print correct
-    print incorrect
+    print "Correct: ", correct
+    print "Incorrect: ", incorrect
     # n.save_weights(percentage, lsizes, learning_rate)
 
 if __name__ == "__main__":

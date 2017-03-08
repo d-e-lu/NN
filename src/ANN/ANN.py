@@ -72,12 +72,13 @@ class ArtificialNeuralNet(object):
         dJdBList.append(delta)
         dJdW = np.multiply(self.a[self.length-3][np.newaxis].T, delta[np.newaxis])
         dJdWList.append(dJdW)
+
         for i in range(self.length-3, 0, -1):
             delta = np.dot(delta, self.W[i+1].T) * self.activation_function_prime(self.z[i])
             dJdBList.append(delta)
             dJdW = np.multiply(self.a[i-1][np.newaxis].T, delta)
+            dJdWList.append(dJdW)
 
-        dJdWList.append(dJdW)
         delta = np.dot(delta, self.W[1].T) * self.activation_function_prime(self.z[0])
         dJdBList.append(delta)
         xarray = np.array([x])
