@@ -105,6 +105,7 @@ class ArtificialNeuralNet(object):
         return squared_error(y, yh)
 
     def train(self, training_data):
+        print "Training started"
         total_cost = 0
         for z in range(1):
             for i in range(len(training_data)):
@@ -112,10 +113,11 @@ class ArtificialNeuralNet(object):
                 total_cost += cost
                 if i % 1000 == 0:
                     avg = float(total_cost) / 1000
-                    print ("data #", i, "cost:", avg)
+                    print "data #{0}, cost {1}".format(i, avg)
                     total_cost = 0
 
     def test(self, testing_data, output_size):
+        print "Testing started"
         incorrect = np.zeros(output_size, dtype=np.int)
         correct = np.zeros(output_size, dtype=np.int)
         number_correct = 0
@@ -148,7 +150,7 @@ class ArtificialNeuralNet(object):
             w1_end = w2_end
 
     def compute_gradients(self, x, y):
-        alldJdW = self.loss_function_prime(x, y)
+        alldJdW, alldJdB = self.loss_function_prime(x, y)
         dJdWList = np.concatenate([alldJdW[0].ravel(), alldJdW[1].ravel()])
         for i in range(2, len(alldJdW)):
             dJdWList = np.concatenate([dJdWList, alldJdW[i].ravel()])
@@ -183,10 +185,13 @@ class NetworkChecker(object):
         for p in range(len(params_initial)):
             perturb[p] = e
             nn.set_params(params_initial + perturb)
-            loss2 = nn.loss_function(x, y)
+            yh1 = nn.forward(x)
+            loss2 = squared_error(y, yh1)
             nn.set_params(params_initial - perturb)
-            loss1 = nn.loss_function(x, y)
-            numgrad[p] = (loss2 - loss1)/(2 * e)
+            yh2 = nn.forward(x)
+            loss1 = squared_error(y, yh2)
+
+            numgrad[p] = np.sum(np.subtract(loss2, loss1)/(2 * e))
             perturb[p] = 0
 
         nn.set_params(params_initial)
@@ -200,6 +205,7 @@ class NetworkChecker(object):
             return False
         for i in range(len(grad)):
             difference = grad[i]-numgrad[i]
+            print difference
             if difference > 0.0001 or difference < -0.0001:
                 print ("Error! gradient and numerical gradient are different.")
                 return False
@@ -230,4 +236,3 @@ def norm_standard(x):
 def shuffle_x_and_y(x, y):
     p = np.random.permutation(len(x))
     return x[p], y[p]
-
