@@ -22,7 +22,7 @@ def squared_error(y, y_hat):
 
 class ArtificialNeuralNet(object):
     def __init__(self, layer_sizes, regularization_function, learning_rate, bias_learning_rate,
-                 momentum=0.0, read_weights_from_file=False):
+                 momentum=0.2, read_weights_from_file=False):
         self.regularization_function = regularization_function
         self.activation_function = sigmoid
         self.activation_function_prime = sigmoid_prime
