@@ -1,36 +1,6 @@
 import numpy as np
 from PIL import Image
 
-filters = {"edge_enhance": np.array([[0, 0, 0],
-                                     [-1, 1, 0],
-                                     [0, 0, 0]], dtype=np.float),
-
-           "edge_detect_1": np.array([[0, 1, 0],
-                                      [1, -4, 1],
-                                      [0, 1, 0]], dtype=np.float),
-
-           "edge_detect_2": np.array([[-1, -1, -1],
-                                      [-1, 8, -1],
-                                      [-1, -1, -1]], dtype=np.float),
-
-           "emboss": np.array([[-2, -1, 0],
-                               [-1, 1, 1],
-                               [0, 1, 2]], dtype=np.float),
-
-           "blur": np.array([[1, 1, 1],
-                             [1, 1, 1],
-                             [1, 1, 1]], dtype=np.float),
-
-           "gaussian_blur": np.array([[1, 2, 1],
-                                      [2, 4, 2],
-                                      [1, 2, 1]], dtype=np.float),
-
-           "sharpen": np.array([[0, -1, 0],
-                                [-1, 5, -1],
-                                [0, -1, 0]], dtype=np.float)
-           }
-
-
 def image_to_greyscale_array(filepath):
     img = Image.open(filepath)
     grey = img.convert('L')
@@ -46,6 +16,31 @@ def save_image(img, name):
     im = Image.fromarray(img)
     im.save(name)
 
+def normalize_colour(x):
+    return np.divide(x, 255)
+
+
+def standalone_convolution(image, kernel, factor = 1.0, bias = 0.0):
+    kernel = np.rot90(kernel, 2) #rotates the kernel by 180 degrees
+    new_image = np.empty_like(image)
+    k_width = len(kernel[0])
+    k_height = len(kernel[:,0])
+    m_width = k_width//2
+    m_height = k_height//2
+    for y in range(len(image[:,0])-(k_height-1)): #For row in image
+        for x in range(len(image[0])-(k_width-1)): #For RGB pixels in row
+            for z in range(len(image[0,0,:])): #For pixel in RGB
+                p = np.sum(np.multiply(image[y:y+k_height, x:x+k_width,z], kernel)) * factor + bias
+                p = min(255, p)
+                p = max(0, p)
+                new_image[y + m_height,x + m_width,z] = p #Input in position at the middle of the kernel on new image
+    return new_image
+
+def standalone_relu(x):
+    return np.maximum(x, 0, x) # faster to do maximum in place
+
+def standalone_relu_prime(x):
+    return np.greater(x, 0).astype(int)
 
 '''
 Convolution and Pooling layers
@@ -86,7 +81,7 @@ class ConvolutionLayer(object):
 
 class ReluLayer(object):
     def relu(self, image):
-        return np.maximum(0, image)
+        return np.maximum(image, 0, image)
 
     def forward(self, image):
         return self.relu(image)
@@ -166,41 +161,42 @@ class FullyConnectedLayer(object):
 
     def loss_function_prime(self, x, y):
         self.y_hat = self.forward(x)
-        dJdWList = []
-        dJdBList = []
+        dj_dw_list = []
+        dj_db_list = []
 
-        delta = np.multiply(-(y - self.y_hat), self.activation_function_prime(self.z[self.length - 2]))
-        dJdBList.append(delta)
-        dJdW = np.multiply(self.a[self.length-3][np.newaxis].T, delta[np.newaxis])
-        dJdWList.append(dJdW)
+        delta = np.multiply(-(y - self.y_hat), self.activation_function_prime(self.z[self.length-2]))
+        dj_db_list.append(delta)
+        dj_dw = np.multiply(self.a[self.length-3][np.newaxis].T, delta[np.newaxis])
+        dj_dw_list.append(dj_dw)
+
         for i in range(self.length-3, 0, -1):
             delta = np.dot(delta, self.W[i+1].T) * self.activation_function_prime(self.z[i])
-            dJdBList.append(delta)
-            dJdW = np.multiply(self.a[i-1][np.newaxis].T, delta)
+            dj_db_list.append(delta)
+            dj_dw = np.multiply(self.a[i-1][np.newaxis].T, delta)
+            dj_dw_list.append(dj_dw)
 
-        dJdWList.append(dJdW)
         delta = np.dot(delta, self.W[1].T) * self.activation_function_prime(self.z[0])
-        dJdBList.append(delta)
-        xarray = np.array([x])
-        dJdW = np.multiply(xarray.T, delta)
-        dJdWList.append(dJdW)
+        dj_db_list.append(delta)
+        x_array = np.array([x])
 
-        dJdWList.reverse()
-        dJdBList.reverse()
-        return dJdWList, dJdBList, delta
+        dj_dw = np.multiply(x_array.T, delta)
+        dj_dw_list.append(dj_dw)
+        dj_dw_list.reverse()
+        dj_db_list.reverse()
+        return dj_dw_list, dj_db_list, delta
 
     def back_prop(self, x, y):
-        dJdWList, dJdBList, delta = self.loss_function_prime(x, y)
+        dj_dw_list, dj_db_list, delta = self.loss_function_prime(x, y)
         if self.momentum:
-            for i in range(len(dJdWList)):
+            for i in range(len(dj_dw_list)):
                 current_weight = self.W[i]
-                self.W[i] = self.W[i] - (dJdWList[i] * self.learning_rate) + (self.momentum * self.delta_W[i])
+                self.W[i] = self.W[i] - (dj_dw_list[i] * self.learning_rate) + (self.momentum * self.delta_W[i])
                 self.delta_W[i] = self.W[i] - current_weight
-                self.b[i] = self.b[i] - (dJdBList[i] * self.bias_learning_rate)
+                self.b[i] = self.b[i] - (dj_db_list[i] * self.bias_learning_rate)
         else:
-            for i in range(len(dJdWList)):
-                self.W[i] = self.W[i] - (dJdWList[i] * self.learning_rate)
-                self.b[i] = self.b[i] - (dJdBList[i] * self.bias_learning_rate)
+            for i in range(len(dj_dw_list)):
+                self.W[i] = self.W[i] - (dj_dw_list[i] * self.learning_rate)
+                self.b[i] = self.b[i] - (dj_db_list[i] * self.bias_learning_rate)
         yh = self.forward(x)
         return delta, squared_error(y, yh)
 
@@ -232,6 +228,7 @@ class FullyConnectedLayer(object):
 
         return percentage, correct, incorrect
 
+
 class CNN(object):
     def __init__(self, layers, fully_connected):
         self.layers = layers
@@ -239,16 +236,22 @@ class CNN(object):
 
     def forward(self, image):
         new_image = image
+        outputs = []
         for layer in self.layers:
             new_image = layer.forward(new_image)
+            outputs.append(new_image)
+        new_image = new_image.ravel()
+        return new_image, outputs
 
-        new_image = new_image.ravel(1)
-        return self.fully_connected.forward(new_image)
+    def back_prop(self, image, label):
+        convolution_layer_estimate, outputs = self.forward(image)
 
-    def backprop(self, image, label):
-        convolution_layer_estimate = self.forward(image)
-        delta, error = self.fully_connected.backprop(convolution_layer_estimate, label)
-        print(delta)
+        dj_dw_list = []
+
+        delta, error = self.fully_connected.back_prop(normalize_colour(convolution_layer_estimate), label)
+        delta = np.dot(delta, self.fully_connected.W[0].T) * standalone_relu_prime(convolution_layer_estimate)
+
+
         '''
         for i in range(len(self.layers)):
             if self.layers[i] is ConvolutionLayer:
@@ -263,5 +266,3 @@ class CNN(object):
 
     def train(self, training_data):
         pass
-
-
