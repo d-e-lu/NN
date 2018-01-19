@@ -37,8 +37,8 @@ class ArtificialNeuralNet(object):
         self.delta_W = []
         if not read_weights_from_file:
             for i in range(self.length - 1):
-                weight = np.random.randn(self.layer_sizes[i], self.layer_sizes[i+1])
-                bias = np.random.randn(self.layer_sizes[i+1])
+                weight = np.random.randn(self.layer_sizes[i,0], self.layer_sizes[i+1,0])
+                bias = np.random.randn(self.layer_sizes[i+1,0])
                 self.W.append(weight)
                 self.b.append(bias)
                 self.delta_W.append(np.zeros_like(weight))
@@ -142,11 +142,11 @@ class ArtificialNeuralNet(object):
 
     def set_params(self, params):
         w_start = 0
-        w1_end = self.layer_sizes[0] * self.layer_sizes[1]
-        self.W[0] = np.reshape(params[w_start:w1_end], (self.layer_sizes[0], self.layer_sizes[1]))
+        w1_end = self.layer_sizes[0,0] * self.layer_sizes[1,0]
+        self.W[0] = np.reshape(params[w_start:w1_end], (self.layer_sizes[0,0], self.layer_sizes[1,0]))
         for layer in range(1, self.length-1):
-            w2_end = w1_end + self.layer_sizes[layer] * self.layer_sizes[layer+1]
-            self.W[layer] = np.reshape(params[w1_end:w2_end], (self.layer_sizes[layer], self.layer_sizes[layer+1]))
+            w2_end = w1_end + self.layer_sizes[layer,0] * self.layer_sizes[layer+1,0]
+            self.W[layer] = np.reshape(params[w1_end:w2_end], (self.layer_sizes[layer,0], self.layer_sizes[layer+1,0]))
             w1_end = w2_end
 
     def compute_gradients(self, x, y):
